@@ -4,6 +4,15 @@
 //      Кеңес тілі: LANG_RU, LANG_KK немесе LANG_EN. Қосу Basic мысалындағыдай.
 // [en] AlashLineSensor: the bar behaves strangely? The sketch shows the raw and normalized values of every sensor, the calibration and tells what to check.
 //      Tips language: LANG_RU, LANG_KK or LANG_EN. Wiring as in the Basic example.
+#if defined(ARDUINO_ARCH_ESP8266)
+// ESP8266 has a single analog input (A0), a sensor bar needs several: use Uno, ESP32, or digital sensor modules with setDigital(true).
+// У ESP8266 один аналоговый вход (A0), а линейке нужно несколько: возьмите Uno, ESP32 или цифровые модули датчиков с setDigital(true).
+void setup() {
+  Serial.begin(115200);
+  Serial.println(F("ESP8266 has one analog input. Use Uno or ESP32, or digital sensor modules with setDigital(true)."));
+}
+void loop() {}
+#else
 #include <AlashLineSensor.h>
 
 #if defined(ARDUINO_ARCH_ESP32)
@@ -26,3 +35,4 @@ void setup() {
 }
 
 void loop() {}
+#endif

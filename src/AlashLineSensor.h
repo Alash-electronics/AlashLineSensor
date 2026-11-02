@@ -17,17 +17,30 @@ class AlashLineSensor {
     ERR_BAD_VALUE          // параметр вне допустимого
   };
   enum Language : uint8_t { LANG_RU = 0, LANG_KK = 1, LANG_EN = 2 };
+  // Как читаются датчики: ANALOG (analogRead), DIGITAL (выход с компаратором, HIGH/LOW), RC (QTR-RC: конденсатор разряжается через фототранзистор, меряем время), CUSTOM (своя функция чтения)
+  enum SensorType : uint8_t { ANALOG = 0, DIGITAL, RC, CUSTOM };
+  // Что делает подсветка при чтении: ON (всегда включена на время чтения), OFF (читать только внешний свет), ON_AND_OFF (вычесть внешний свет: чтение с подсветкой плюс максимум минус чтение без неё),
+  // ODD_EVEN (нечётные и чётные датчики по очереди со своими подсветками: меньше засветка соседями; нужны два пина подсветки)
+  enum ReadMode : uint8_t { READ_ON = 0, READ_OFF, READ_ON_AND_OFF, READ_ODD_EVEN };
+  typedef uint16_t (*Reader)(uint8_t index);   // своя функция: вернуть сырое значение датчика index (мультиплексор CD4051, АЦП ADS1115 по I2C, расширитель пинов, ...)
 
   // pins: массив пинов (аналоговых или цифровых), count: сколько датчиков (1..16)
   AlashLineSensor(const uint8_t *pins, uint8_t count);
+  // Без пинов: данные даёт ваша функция, задайте её через setReader()
+  explicit AlashLineSensor(uint8_t count) : _pins(nullptr), _n(count) { _type = CUSTOM; }
   ~AlashLineSensor();
   AlashLineSensor(const AlashLineSensor &) = delete;
   AlashLineSensor &operator=(const AlashLineSensor &) = delete;
 
   bool begin();                                     // настроить пины, выделить память; false при ошибке (см. error())
   void setEmitterPin(uint8_t pin, bool activeHigh = true);   // вывод включения подсветки (LEDON у QTR): включается на время измерения
-  void setDigital(bool digital) { _digital = digital; }       // цифровые датчики (HIGH на тёмном, как у модулей TCRT5000 с компаратором): калибровка не нужна
-  void setAdcMax(uint16_t maxValue) { _adcMax = maxValue; }   // максимум АЦП: 1023 (Uno, ESP8266 с делителем) или 4095 (ESP32)
+  void setEmitterPins(uint8_t oddPin, uint8_t evenPin, bool activeHigh = true);   // отдельные подсветки нечётных и чётных датчиков (QTR второго поколения: CTRL ODD и CTRL EVEN)
+  void setReadMode(ReadMode mode) { _mode = mode; }
+  void setSensorType(SensorType t) { if (t != CUSTOM || _reader) _type = t; }
+  void setDigital(bool digital) { _type = digital ? DIGITAL : ANALOG; }   // коротко: цифровые датчики (HIGH на тёмном, как у модулей TCRT5000 с компаратором): калибровка не нужна
+  void setReader(Reader fn) { _reader = fn; if (fn) _type = CUSTOM; }
+  void setRcTimeout(uint16_t us);                             // для RC: время в мкс, дольше которого считаем «совсем чёрное» (1000-3000, по умолчанию 2500)
+  void setAdcMax(uint16_t maxValue) { _adcMax = maxValue; }   // максимум АЦП: 1023 (Uno), 4095 (ESP32) или максимум вашей функции чтения
   void setSamples(uint8_t n) { _samples = n < 1 ? 1 : (n > 16 ? 16 : n); }   // сколько измерений усреднять
   void setWhiteLine(bool white) { _white = white; }           // белая линия на тёмном фоне
   void setInvert(bool invert) { _invert = invert; }           // если ваш модуль на тёмном даёт МЕНЬШЕЕ число (у QTR и большинства модулей TCRT5000 на тёмном число больше)
@@ -63,11 +76,15 @@ class AlashLineSensor {
 
  private:
   uint16_t sample(uint8_t i);
+  void readOnce(uint16_t *out, uint8_t start, uint8_t step);
+  void readRc(uint16_t *out, uint8_t start, uint8_t step);
+  void emitters(uint8_t which, bool on);
   const uint8_t *_pins; uint8_t _n;
   uint16_t *_min = nullptr, *_max = nullptr;
   uint16_t _adcMax = 1023, _threshold = 500;
-  uint8_t _samples = 4, _emitter = 255, _active = 0;
-  bool _emitterHigh = true, _digital = false, _white = false, _invert = false, _calibrated = false, _begun = false;
+  uint8_t _samples = 4, _emitter = 255, _emitterOdd = 255, _emitterEven = 255, _active = 0;
+  SensorType _type = ANALOG; ReadMode _mode = READ_ON; Reader _reader = nullptr; uint16_t _rcTimeout = 2500;
+  bool _emitterHigh = true, _white = false, _invert = false, _calibrated = false, _begun = false;
   bool _seen = false, _crossing = false, _clear = true, _lastRight = false;
   uint16_t _lastPos = 0;
   Error _err = ERR_OK; Language _lang = LANG_RU;

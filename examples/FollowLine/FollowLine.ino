@@ -10,11 +10,25 @@
 //      when the line is lost the robot turns toward the side where it was last seen. Motors through an L298N / L9110 driver (two PWM pin pairs).
 //      For smoother driving use AlashPID instead of one gain (a controller with an integral and a derivative).
 //      Motor wiring: left on pins 5 and 6, right on 9 and 10 (PWM). The bar as in the Basic example. Hold the robot with its wheels up for the first test!
+#if defined(ARDUINO_ARCH_ESP8266)
+// ESP8266 has a single analog input (A0), a sensor bar needs several: use Uno, ESP32, or digital sensor modules with setDigital(true).
+// У ESP8266 один аналоговый вход (A0), а линейке нужно несколько: возьмите Uno, ESP32 или цифровые модули датчиков с setDigital(true).
+void setup() {
+  Serial.begin(115200);
+  Serial.println(F("ESP8266 has one analog input. Use Uno or ESP32, or digital sensor modules with setDigital(true)."));
+}
+void loop() {}
+#else
 #include <AlashLineSensor.h>
 
+#if defined(ARDUINO_ARCH_ESP32)
+const uint8_t PINS[5] = {36, 39, 34, 35, 32};
+const uint8_t L1 = 25, L2 = 26, R1 = 27, R2 = 14;   // пины моторов ESP32
+#else
 const uint8_t PINS[5] = {A0, A1, A2, A3, A4};
+const uint8_t L1 = 5, L2 = 6, R1 = 9, R2 = 10;       // пины моторов (ШИМ)
+#endif
 AlashLineSensor line(PINS, 5);
-const uint8_t L1 = 5, L2 = 6, R1 = 9, R2 = 10;       // пины моторов (на ESP32 укажите свои пины и подключите analogWrite)
 const int BASE = 150;                                // скорость 0..255
 const float KP = 0.08f;                              // сколько единиц поворота на единицу отклонения
 
@@ -26,6 +40,9 @@ void drive(int left, int right) {
 
 void setup() {
   Serial.begin(115200);
+#if defined(ARDUINO_ARCH_ESP32)
+  line.setAdcMax(4095);
+#endif
   line.begin();
   Serial.println(F("Calibrating: sweep the bar over the line..."));
   line.calibrate(3000);
@@ -38,3 +55,4 @@ void loop() {
   int turn = (int)(KP * off);
   drive(BASE + turn, BASE - turn);
 }
+#endif

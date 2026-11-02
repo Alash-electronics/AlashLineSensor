@@ -10,6 +10,15 @@
 //
 //      Bar wiring (QTR-5A or 5 TCRT5000 modules): VCC to 5 V, GND to GND, outputs to A0-A4 (ESP32: GPIO 36, 39, 34, 35, 32).
 //      Hold the bar 3-9 mm above the surface. First the calibration: for 3 seconds sweep the bar over the line and the background.
+#if defined(ARDUINO_ARCH_ESP8266)
+// ESP8266 has a single analog input (A0), a sensor bar needs several: use Uno, ESP32, or digital sensor modules with setDigital(true).
+// У ESP8266 один аналоговый вход (A0), а линейке нужно несколько: возьмите Uno, ESP32 или цифровые модули датчиков с setDigital(true).
+void setup() {
+  Serial.begin(115200);
+  Serial.println(F("ESP8266 has one analog input. Use Uno or ESP32, or digital sensor modules with setDigital(true)."));
+}
+void loop() {}
+#else
 #include <AlashLineSensor.h>
 
 #if defined(ARDUINO_ARCH_ESP32)
@@ -36,3 +45,4 @@ void loop() {
   else { Serial.print(F("position: ")); Serial.print(pos); Serial.print(F("   offset: ")); Serial.println(line.offset()); }
   delay(100);
 }
+#endif

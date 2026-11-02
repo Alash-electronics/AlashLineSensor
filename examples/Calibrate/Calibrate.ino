@@ -4,6 +4,15 @@
 //      сосын скетч setCalibration(...) жолдарын басып шығарады. Оларды calibrate() орнына setup() ішіне қойыңыз: әр іске қосуда калибрлеудің қажеті жоқ.
 // [en] AlashLineSensor: calibration and moving the numbers into the sketch. Sweep the bar over the line and the background (no button needed, 5 seconds after power-on),
 //      then the sketch prints setCalibration(...) lines. Paste them into setup() instead of calibrate(): you will not have to calibrate on every start.
+#if defined(ARDUINO_ARCH_ESP8266)
+// ESP8266 has a single analog input (A0), a sensor bar needs several: use Uno, ESP32, or digital sensor modules with setDigital(true).
+// У ESP8266 один аналоговый вход (A0), а линейке нужно несколько: возьмите Uno, ESP32 или цифровые модули датчиков с setDigital(true).
+void setup() {
+  Serial.begin(115200);
+  Serial.println(F("ESP8266 has one analog input. Use Uno or ESP32, or digital sensor modules with setDigital(true)."));
+}
+void loop() {}
+#else
 #include <AlashLineSensor.h>
 
 #if defined(ARDUINO_ARCH_ESP32)
@@ -29,3 +38,4 @@ void setup() {
 }
 
 void loop() {}
+#endif
