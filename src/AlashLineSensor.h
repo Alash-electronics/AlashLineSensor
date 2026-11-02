@@ -17,8 +17,8 @@ class AlashLineSensor {
     ERR_BAD_VALUE          // параметр вне допустимого
   };
   enum Language : uint8_t { LANG_RU = 0, LANG_KK = 1, LANG_EN = 2 };
-  // Как читаются датчики: ANALOG (analogRead), DIGITAL (выход с компаратором, HIGH/LOW), RC (QTR-RC: конденсатор разряжается через фототранзистор, меряем время), CUSTOM (своя функция чтения)
-  enum SensorType : uint8_t { ANALOG = 0, DIGITAL, RC, CUSTOM };
+  // Как читаются датчики: SENSOR_ANALOG (analogRead), SENSOR_DIGITAL (выход с компаратором, HIGH/LOW), SENSOR_RC (QTR-RC: конденсатор разряжается через фототранзистор, меряем время), SENSOR_CUSTOM (своя функция чтения)
+  enum SensorType : uint8_t { SENSOR_ANALOG = 0, SENSOR_DIGITAL, SENSOR_RC, SENSOR_CUSTOM };
   // Что делает подсветка при чтении: ON (всегда включена на время чтения), OFF (читать только внешний свет), ON_AND_OFF (вычесть внешний свет: чтение с подсветкой плюс максимум минус чтение без неё),
   // ODD_EVEN (нечётные и чётные датчики по очереди со своими подсветками: меньше засветка соседями; нужны два пина подсветки)
   enum ReadMode : uint8_t { READ_ON = 0, READ_OFF, READ_ON_AND_OFF, READ_ODD_EVEN };
@@ -27,7 +27,7 @@ class AlashLineSensor {
   // pins: массив пинов (аналоговых или цифровых), count: сколько датчиков (1..16)
   AlashLineSensor(const uint8_t *pins, uint8_t count);
   // Без пинов: данные даёт ваша функция, задайте её через setReader()
-  explicit AlashLineSensor(uint8_t count) : _pins(nullptr), _n(count) { _type = CUSTOM; }
+  explicit AlashLineSensor(uint8_t count) : _pins(nullptr), _n(count) { _type = SENSOR_CUSTOM; }
   ~AlashLineSensor();
   AlashLineSensor(const AlashLineSensor &) = delete;
   AlashLineSensor &operator=(const AlashLineSensor &) = delete;
@@ -36,9 +36,9 @@ class AlashLineSensor {
   void setEmitterPin(uint8_t pin, bool activeHigh = true);   // вывод включения подсветки (LEDON у QTR): включается на время измерения
   void setEmitterPins(uint8_t oddPin, uint8_t evenPin, bool activeHigh = true);   // отдельные подсветки нечётных и чётных датчиков (QTR второго поколения: CTRL ODD и CTRL EVEN)
   void setReadMode(ReadMode mode) { _mode = mode; }
-  void setSensorType(SensorType t) { if (t != CUSTOM || _reader) _type = t; }
-  void setDigital(bool digital) { _type = digital ? DIGITAL : ANALOG; }   // коротко: цифровые датчики (HIGH на тёмном, как у модулей TCRT5000 с компаратором): калибровка не нужна
-  void setReader(Reader fn) { _reader = fn; if (fn) _type = CUSTOM; }
+  void setSensorType(SensorType t) { if (t != SENSOR_CUSTOM || _reader) _type = t; }
+  void setDigital(bool digital) { _type = digital ? SENSOR_DIGITAL : SENSOR_ANALOG; }   // коротко: цифровые датчики (HIGH на тёмном, как у модулей TCRT5000 с компаратором): калибровка не нужна
+  void setReader(Reader fn) { _reader = fn; if (fn) _type = SENSOR_CUSTOM; }
   void setRcTimeout(uint16_t us);                             // для RC: время в мкс, дольше которого считаем «совсем чёрное» (1000-3000, по умолчанию 2500)
   void setAdcMax(uint16_t maxValue) { _adcMax = maxValue; }   // максимум АЦП: 1023 (Uno), 4095 (ESP32) или максимум вашей функции чтения
   void setSamples(uint8_t n) { _samples = n < 1 ? 1 : (n > 16 ? 16 : n); }   // сколько измерений усреднять
@@ -83,7 +83,7 @@ class AlashLineSensor {
   uint16_t *_min = nullptr, *_max = nullptr;
   uint16_t _adcMax = 1023, _threshold = 500;
   uint8_t _samples = 4, _emitter = 255, _emitterOdd = 255, _emitterEven = 255, _active = 0;
-  SensorType _type = ANALOG; ReadMode _mode = READ_ON; Reader _reader = nullptr; uint16_t _rcTimeout = 2500;
+  SensorType _type = SENSOR_ANALOG; ReadMode _mode = READ_ON; Reader _reader = nullptr; uint16_t _rcTimeout = 2500;
   bool _emitterHigh = true, _white = false, _invert = false, _calibrated = false, _begun = false;
   bool _seen = false, _crossing = false, _clear = true, _lastRight = false;
   uint16_t _lastPos = 0;

@@ -11,11 +11,11 @@
 //      For smoother driving use AlashPID instead of one gain (a controller with an integral and a derivative).
 //      Motor wiring: left on pins 5 and 6, right on 9 and 10 (PWM). The bar as in the Basic example. Hold the robot with its wheels up for the first test!
 #if defined(ARDUINO_ARCH_ESP8266)
-// ESP8266 has a single analog input (A0), a sensor bar needs several: use Uno, ESP32, or digital sensor modules with setDigital(true).
-// У ESP8266 один аналоговый вход (A0), а линейке нужно несколько: возьмите Uno, ESP32 или цифровые модули датчиков с setDigital(true).
+// ESP8266 has a single analog input (A0), a sensor bar needs several: use Uno, ESP32, RC sensors on digital pins (the RC_Sensors example) or a multiplexer (the Multiplexer example).
+// У ESP8266 один аналоговый вход (A0), а линейке нужно несколько: возьмите Uno, ESP32, RC-датчики на цифровых пинах (пример RC_Sensors) или мультиплексор (пример Multiplexer).
 void setup() {
   Serial.begin(115200);
-  Serial.println(F("ESP8266 has one analog input. Use Uno or ESP32, or digital sensor modules with setDigital(true)."));
+  Serial.println(F("ESP8266 has one analog input. See the RC_Sensors and Multiplexer examples."));
 }
 void loop() {}
 #else

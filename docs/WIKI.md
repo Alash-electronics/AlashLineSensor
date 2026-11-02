@@ -22,7 +22,7 @@ Arduino Uno / Nano / Mega (AVR), ESP32, ESP8266 и другие, где рабо
 | OUT 1..5 | A0..A4 | GPIO 36, 39, 34, 35, 32 |
 | LEDON (QTR) | любой пин, необязательно | любой пин |
 
-Держите линейку на высоте 3-9 мм от поверхности. У большинства линеек на тёмном число больше; если у вашего модуля наоборот, вызовите `setInvert(true)`. Для ESP32 задайте `setAdcMax(4095)` и питайте линейку от 3.3 В (датчик на 5 В даст ESP32 выше допустимого). У ESP8266 один аналоговый вход, поэтому нужны цифровые модули (`setDigital(true)`) или мультиплексор.
+Держите линейку на высоте 3-9 мм от поверхности. У большинства линеек на тёмном число больше; если у вашего модуля наоборот, вызовите `setInvert(true)`. Для ESP32 задайте `setAdcMax(4095)` и питайте линейку от 3.3 В (датчик на 5 В даст ESP32 выше допустимого). У ESP8266 один аналоговый вход: используйте RC-датчики на цифровых пинах (`setSensorType(SENSOR_RC)`), цифровые модули (`setDigital(true)`) или мультиплексор (`setReader()`).
 
 ### Быстрый старт
 ```cpp
@@ -43,7 +43,8 @@ void loop() {
 - **Потеря линии:** `lineLost()`, и `position()` возвращает сторону, где линию видели последний раз.
 - **Перекрёстки:** `crossing()`, `activeCount()` для остановки и счёта полос.
 - **Чёрная и белая линия, обратная полярность:** `setWhiteLine()`, `setInvert()`.
-- **Аналоговые и цифровые датчики, АЦП 10 и 12 бит, подсветка:** `setDigital()`, `setAdcMax()`, `setEmitterPin()`.
+- **Любые датчики:** аналоговые, цифровые (с компаратором), RC (QTR-RC, на обычных цифровых пинах) и своя функция чтения для мультиплексора CD4051, ADS1115 и т. п.: `setSensorType()`, `setReader()`, `setAdcMax()`.
+- **Подсветка:** общая или отдельно нечётная и чётная, активный HIGH или LOW, режимы `READ_ON`, `READ_OFF`, `READ_ON_AND_OFF` (вычитание внешнего света), `READ_ODD_EVEN`.
 - **Меньше шума:** усреднение `setSamples()` и порог `setThreshold()`.
 - **Видно, что происходит:** `diagnose(Serial)` показывает сырые, нормированные значения и подсказывает (высота, освещение, питание) на трёх языках.
 - Работает на **Arduino AVR, ESP32, ESP8266**.
@@ -58,8 +59,9 @@ void loop() {
 | `position() / offset()` | Положение 0..(n-1)*1000 / отклонение от центра |
 | `read(out) / readRaw(out)` | Нормированные 0..1000 / сырые значения |
 | `lineDetected() / lineLost() / crossing() / allClear()` | Состояния линии |
-| `setWhiteLine() / setInvert() / setDigital() / setAdcMax()` | Белая линия, полярность, цифровые, АЦП |
-| `setSamples() / setThreshold() / setEmitterPin()` | Усреднение, порог, подсветка |
+| `setSensorType(SENSOR_ANALOG / SENSOR_DIGITAL / SENSOR_RC) / setReader(fn)` | Тип датчиков: аналоговые, цифровые, RC или своя функция чтения |
+| `setWhiteLine() / setInvert() / setAdcMax()` | Белая линия, полярность, АЦП |
+| `setSamples() / setThreshold() / setEmitterPin(s) / setReadMode()` | Усреднение, порог, подсветка и её режимы |
 | `error() / errorText() / diagnose(Serial)` | Ошибка, сообщение, самопроверка на ru/kk/en |
 
 ### Если что-то не работает
@@ -87,7 +89,7 @@ void loop() {
 В библиотеке есть `diagnose(Serial)`: она печатает, что видит плата, и подсказывает, что проверить. Язык подсказок: `setLanguage(LANG_RU / LANG_KK / LANG_EN)`.
 
 ### Примеры
-`Basic`, `Calibrate`, `FollowLine`, `Diagnose`
+`Basic`, `Calibrate`, `FollowLine`, `RC_Sensors`, `Multiplexer`, `Diagnose`
 
 ---
 
@@ -130,7 +132,8 @@ void loop() {
 - **Сызықтың жоғалуы:** `lineLost()`, және `position()` сызық соңғы рет көрінген жақты қайтарады.
 - **Қиылыстар:** `crossing()`, тоқтату және жолақтарды санау үшін `activeCount()`.
 - **Қара және ақ сызық, кері полярлық:** `setWhiteLine()`, `setInvert()`.
-- **Аналогтық және сандық датчиктер, АЦП 10 және 12 бит, жарықтандыру:** `setDigital()`, `setAdcMax()`, `setEmitterPin()`.
+- **Кез келген датчиктер:** аналогтық, сандық (компараторлы), RC (QTR-RC, қарапайым сандық пиндерде) және CD4051 мультиплексоры, ADS1115 т.б. үшін өз оқу функциясы: `setSensorType()`, `setReader()`, `setAdcMax()`.
+- **Жарықтандыру:** ортақ немесе жеке тақ және жұп, белсенді HIGH немесе LOW, `READ_ON`, `READ_OFF`, `READ_ON_AND_OFF` (сыртқы жарықты алу), `READ_ODD_EVEN` режимдері.
 - **Шу аз:** `setSamples()` орташалау және `setThreshold()` шегі.
 - **Не болып жатқаны көрінеді:** `diagnose(Serial)` шикі, нормаланған мәндерді көрсетеді және үш тілде кеңес береді (биіктік, жарықтандыру, қуат).
 - **Arduino AVR, ESP32, ESP8266** тақталарында жұмыс істейді.
@@ -145,8 +148,9 @@ void loop() {
 | `position() / offset()` | Орын / центрден ауытқу |
 | `read(out) / readRaw(out)` | Нормаланған / шикі |
 | `lineDetected() / lineLost() / crossing() / allClear()` | Сызық күйлері |
-| `setWhiteLine() / setInvert() / setDigital() / setAdcMax()` | Ақ сызық, полярлық, сандық, АЦП |
-| `setSamples() / setThreshold() / setEmitterPin()` | Орташалау, шек, жарықтандыру |
+| `setSensorType(SENSOR_ANALOG / SENSOR_DIGITAL / SENSOR_RC) / setReader(fn)` | Датчик түрі |
+| `setWhiteLine() / setInvert() / setAdcMax()` | Ақ сызық, полярлық, сандық, АЦП |
+| `setSamples() / setThreshold() / setEmitterPin(s) / setReadMode()` | Орташалау, шек, жарықтандыру |
 | `error() / errorText() / diagnose(Serial)` | Қате, хабарлама, өзін-өзі тексеру |
 
 ### Бірдеңе жұмыс істемесе
@@ -174,7 +178,7 @@ ESP32 АЦП 12 биттік: `setAdcMax(4095)`. Пиндер ADC1-де болу
 Кітапханада `diagnose(Serial)` бар: тақта не көргенін басып шығарады және нені тексеру керегін айтады. Кеңес тілі: `setLanguage(LANG_RU / LANG_KK / LANG_EN)`.
 
 ### Мысалдар
-`Basic`, `Calibrate`, `FollowLine`, `Diagnose`
+`Basic`, `Calibrate`, `FollowLine`, `RC_Sensors`, `Multiplexer`, `Diagnose`
 
 ---
 
@@ -217,7 +221,8 @@ void loop() {
 - **Line loss:** `lineLost()`, and `position()` returns the side where the line was last seen.
 - **Crossings:** `crossing()`, `activeCount()` for stopping and counting stripes.
 - **Black and white lines, reversed polarity:** `setWhiteLine()`, `setInvert()`.
-- **Analog and digital sensors, 10 and 12 bit ADC, emitter:** `setDigital()`, `setAdcMax()`, `setEmitterPin()`.
+- **Any sensors:** analog, digital (with a comparator), RC (QTR-RC, on ordinary digital pins) and your own read function for a CD4051 multiplexer, an ADS1115 and the like: `setSensorType()`, `setReader()`, `setAdcMax()`.
+- **Emitter:** common or separate odd and even, active HIGH or LOW, the modes `READ_ON`, `READ_OFF`, `READ_ON_AND_OFF` (ambient light subtraction), `READ_ODD_EVEN`.
 - **Less noise:** `setSamples()` averaging and the `setThreshold()` threshold.
 - **See what happens:** `diagnose(Serial)` shows the raw and normalized values and gives tips (height, lighting, power) in three languages.
 - Works on **Arduino AVR, ESP32, ESP8266**.
@@ -232,8 +237,9 @@ void loop() {
 | `position() / offset()` | Position 0..(n-1)*1000 / offset from the center |
 | `read(out) / readRaw(out)` | Normalized 0..1000 / raw values |
 | `lineDetected() / lineLost() / crossing() / allClear()` | Line states |
-| `setWhiteLine() / setInvert() / setDigital() / setAdcMax()` | White line, polarity, digital, ADC |
-| `setSamples() / setThreshold() / setEmitterPin()` | Averaging, threshold, emitter |
+| `setSensorType(SENSOR_ANALOG / SENSOR_DIGITAL / SENSOR_RC) / setReader(fn)` | Sensor type: analog, digital, RC or your own read function |
+| `setWhiteLine() / setInvert() / setAdcMax()` | White line, polarity, digital, ADC |
+| `setSamples() / setThreshold() / setEmitterPin(s) / setReadMode()` | Averaging, threshold, emitter |
 | `error() / errorText() / diagnose(Serial)` | Error, message, self-check in ru/kk/en |
 
 ### If something does not work
@@ -261,7 +267,7 @@ The default threshold is 500 of 1000. If the line is faint lower it with `setThr
 The library has `diagnose(Serial)`: it prints what the board sees and tells what to check. Tips language: `setLanguage(LANG_RU / LANG_KK / LANG_EN)`.
 
 ### Examples
-`Basic`, `Calibrate`, `FollowLine`, `Diagnose`
+`Basic`, `Calibrate`, `FollowLine`, `RC_Sensors`, `Multiplexer`, `Diagnose`
 
 ---
 

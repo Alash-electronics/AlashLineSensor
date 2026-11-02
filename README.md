@@ -26,7 +26,8 @@ void loop() {
 - **Потеря линии:** `lineLost()`, и `position()` возвращает сторону, где линию видели последний раз.
 - **Перекрёстки:** `crossing()`, `activeCount()` для остановки и счёта полос.
 - **Чёрная и белая линия, обратная полярность:** `setWhiteLine()`, `setInvert()`.
-- **Аналоговые и цифровые датчики, АЦП 10 и 12 бит, подсветка:** `setDigital()`, `setAdcMax()`, `setEmitterPin()`.
+- **Любые датчики:** аналоговые, цифровые (с компаратором), RC (QTR-RC, на обычных цифровых пинах) и своя функция чтения для мультиплексора CD4051, ADS1115 и т. п.: `setSensorType()`, `setReader()`, `setAdcMax()`.
+- **Подсветка:** общая или отдельно нечётная и чётная, активный HIGH или LOW, режимы `READ_ON`, `READ_OFF`, `READ_ON_AND_OFF` (вычитание внешнего света), `READ_ODD_EVEN`.
 - **Меньше шума:** усреднение `setSamples()` и порог `setThreshold()`.
 - **Видно, что происходит:** `diagnose(Serial)` показывает сырые, нормированные значения и подсказывает (высота, освещение, питание) на трёх языках.
 - Работает на **Arduino AVR, ESP32, ESP8266**.
@@ -39,7 +40,7 @@ void loop() {
 | OUT 1..5 | A0..A4 | GPIO 36, 39, 34, 35, 32 |
 | LEDON (QTR) | любой пин, необязательно | любой пин |
 
-Держите линейку на высоте 3-9 мм от поверхности. У большинства линеек на тёмном число больше; если у вашего модуля наоборот, вызовите `setInvert(true)`. Для ESP32 задайте `setAdcMax(4095)` и питайте линейку от 3.3 В (датчик на 5 В даст ESP32 выше допустимого). У ESP8266 один аналоговый вход, поэтому нужны цифровые модули (`setDigital(true)`) или мультиплексор.
+Держите линейку на высоте 3-9 мм от поверхности. У большинства линеек на тёмном число больше; если у вашего модуля наоборот, вызовите `setInvert(true)`. Для ESP32 задайте `setAdcMax(4095)` и питайте линейку от 3.3 В (датчик на 5 В даст ESP32 выше допустимого). У ESP8266 один аналоговый вход: используйте RC-датчики на цифровых пинах (`setSensorType(SENSOR_RC)`), цифровые модули (`setDigital(true)`) или мультиплексор (`setReader()`).
 
 ### Чем отличается от других библиотек
 Мы изучили QTRSensors (Pololu), Arduino-Line-Follower и библиотеки для TCRT5000:
@@ -49,7 +50,7 @@ void loop() {
 - Нет запоминания стороны потери линии; у нас `position()` возвращает последнюю сторону.
 
 ### Примеры
-`Basic`, `Calibrate`, `FollowLine`, `Diagnose`
+`Basic`, `Calibrate`, `FollowLine`, `RC_Sensors`, `Multiplexer`, `Diagnose`
 
 ### Тесты
 Без железа (с AddressSanitizer) на имитации линейки над полом с линией: калибровка с разными усилениями датчиков, нормировка 0..1000, положение линии растёт монотонно и точно в центре и по краям, потеря линии с запоминанием стороны, перекрёсток для 5 и 8 датчиков, белая линия, обратная полярность, шум и усреднение, АЦП на 12 бит, цифровые датчики, подсветка включается только на время измерения, неудачная калибровка и ручные числа, ошибки и диагностика: `extras/test`.
@@ -80,7 +81,8 @@ void loop() {
 - **Сызықтың жоғалуы:** `lineLost()`, және `position()` сызық соңғы рет көрінген жақты қайтарады.
 - **Қиылыстар:** `crossing()`, тоқтату және жолақтарды санау үшін `activeCount()`.
 - **Қара және ақ сызық, кері полярлық:** `setWhiteLine()`, `setInvert()`.
-- **Аналогтық және сандық датчиктер, АЦП 10 және 12 бит, жарықтандыру:** `setDigital()`, `setAdcMax()`, `setEmitterPin()`.
+- **Кез келген датчиктер:** аналогтық, сандық (компараторлы), RC (QTR-RC, қарапайым сандық пиндерде) және CD4051 мультиплексоры, ADS1115 т.б. үшін өз оқу функциясы: `setSensorType()`, `setReader()`, `setAdcMax()`.
+- **Жарықтандыру:** ортақ немесе жеке тақ және жұп, белсенді HIGH немесе LOW, `READ_ON`, `READ_OFF`, `READ_ON_AND_OFF` (сыртқы жарықты алу), `READ_ODD_EVEN` режимдері.
 - **Шу аз:** `setSamples()` орташалау және `setThreshold()` шегі.
 - **Не болып жатқаны көрінеді:** `diagnose(Serial)` шикі, нормаланған мәндерді көрсетеді және үш тілде кеңес береді (биіктік, жарықтандыру, қуат).
 - **Arduino AVR, ESP32, ESP8266** тақталарында жұмыс істейді.
@@ -103,7 +105,7 @@ QTRSensors (Pololu), Arduino-Line-Follower және TCRT5000 кітапхана�
 - Сызық жоғалған жақты есте сақтау жоқ; бізде `position()` соңғы жақты қайтарады.
 
 ### Мысалдар
-`Basic`, `Calibrate`, `FollowLine`, `Diagnose`
+`Basic`, `Calibrate`, `FollowLine`, `RC_Sensors`, `Multiplexer`, `Diagnose`
 
 ### Тесттер
 Құрылғысыз (AddressSanitizer-мен) сызығы бар едендегі линейка имитациясында: датчиктердің әртүрлі күшейтуімен калибрлеу, 0..1000 нормалау, сызық орны монотонды өседі және ортада мен шеттерде дәл, жақты есте сақтап сызықтың жоғалуы, 5 және 8 датчик үшін қиылыс, ақ сызық, кері полярлық, шу және орташалау, 12 биттік АЦП, сандық датчиктер, жарықтандыру тек өлшеу кезінде қосылады, сәтсіз калибрлеу, қателер: `extras/test`.
@@ -134,7 +136,8 @@ void loop() {
 - **Line loss:** `lineLost()`, and `position()` returns the side where the line was last seen.
 - **Crossings:** `crossing()`, `activeCount()` for stopping and counting stripes.
 - **Black and white lines, reversed polarity:** `setWhiteLine()`, `setInvert()`.
-- **Analog and digital sensors, 10 and 12 bit ADC, emitter:** `setDigital()`, `setAdcMax()`, `setEmitterPin()`.
+- **Any sensors:** analog, digital (with a comparator), RC (QTR-RC, on ordinary digital pins) and your own read function for a CD4051 multiplexer, an ADS1115 and the like: `setSensorType()`, `setReader()`, `setAdcMax()`.
+- **Emitter:** common or separate odd and even, active HIGH or LOW, the modes `READ_ON`, `READ_OFF`, `READ_ON_AND_OFF` (ambient light subtraction), `READ_ODD_EVEN`.
 - **Less noise:** `setSamples()` averaging and the `setThreshold()` threshold.
 - **See what happens:** `diagnose(Serial)` shows the raw and normalized values and gives tips (height, lighting, power) in three languages.
 - Works on **Arduino AVR, ESP32, ESP8266**.
@@ -157,7 +160,7 @@ We studied QTRSensors (Pololu), Arduino-Line-Follower and TCRT5000 libraries:
 - No memory of the side where the line was lost; ours `position()` returns the last side.
 
 ### Examples
-`Basic`, `Calibrate`, `FollowLine`, `Diagnose`
+`Basic`, `Calibrate`, `FollowLine`, `RC_Sensors`, `Multiplexer`, `Diagnose`
 
 ### Tests
 Without hardware (with AddressSanitizer) on a simulated bar over a floor with a line: calibration with different sensor gains, 0..1000 normalization, the line position grows monotonically and is exact at the center and the edges, line loss with a remembered side, a crossing for 5 and 8 sensors, a white line, reversed polarity, noise and averaging, a 12-bit ADC, digital sensors, the emitter lit only during a measurement, a failed calibration and manual numbers, errors and diagnostics: `extras/test`.

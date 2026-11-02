@@ -9,13 +9,13 @@ AlashLineSensor::AlashLineSensor(const uint8_t *pins, uint8_t count) : _pins(pin
 AlashLineSensor::~AlashLineSensor() { free(_min); free(_max); }
 
 bool AlashLineSensor::begin() {
-  if (_n < 1 || _n > 16 || (_type != CUSTOM && !_pins) || (_type == CUSTOM && !_reader)) { _err = ERR_BAD_COUNT; return false; }
+  if (_n < 1 || _n > 16 || (_type != SENSOR_CUSTOM && !_pins) || (_type == SENSOR_CUSTOM && !_reader)) { _err = ERR_BAD_COUNT; return false; }
   free(_min); free(_max);
   _min = (uint16_t *)malloc(_n * sizeof(uint16_t));
   _max = (uint16_t *)malloc(_n * sizeof(uint16_t));
   if (!_min || !_max) { free(_min); free(_max); _min = _max = nullptr; _err = ERR_NO_MEMORY; return false; }
-  if (_type == RC) _adcMax = _rcTimeout;
-  for (uint8_t i = 0; i < _n; i++) { _min[i] = _adcMax; _max[i] = 0; if (_pins && _type != RC) pinMode(_pins[i], INPUT); }
+  if (_type == SENSOR_RC) _adcMax = _rcTimeout;
+  for (uint8_t i = 0; i < _n; i++) { _min[i] = _adcMax; _max[i] = 0; if (_pins && _type != SENSOR_RC) pinMode(_pins[i], INPUT); }
   _begun = true;
   emitters(3, false);                          // подсветка выключена, пока не измеряем
   _calibrated = false; _err = ERR_OK; _lastPos = 0; _lastRight = false;
@@ -25,7 +25,7 @@ bool AlashLineSensor::begin() {
 void AlashLineSensor::setRcTimeout(uint16_t us) {
   if (us < 200 || us > 32000) { _err = ERR_BAD_VALUE; return; }
   _rcTimeout = us;
-  if (_type == RC) _adcMax = us;
+  if (_type == SENSOR_RC) _adcMax = us;
 }
 
 void AlashLineSensor::setEmitterPin(uint8_t pin, bool activeHigh) {
@@ -71,10 +71,10 @@ void AlashLineSensor::readRc(uint16_t *out, uint8_t start, uint8_t step) {
 
 // Один проход по датчикам start, start+step, ... в нужном типе
 void AlashLineSensor::readOnce(uint16_t *out, uint8_t start, uint8_t step) {
-  if (_type == RC) { readRc(out, start, step); return; }
+  if (_type == SENSOR_RC) { readRc(out, start, step); return; }
   for (uint8_t i = start; i < _n; i += step) {
-    if (_type == CUSTOM) out[i] = _reader(i);
-    else if (_type == DIGITAL) out[i] = digitalRead(_pins[i]) ? _adcMax : 0;
+    if (_type == SENSOR_CUSTOM) out[i] = _reader(i);
+    else if (_type == SENSOR_DIGITAL) out[i] = digitalRead(_pins[i]) ? _adcMax : 0;
     else out[i] = sample(i);
   }
 }
@@ -148,7 +148,7 @@ void AlashLineSensor::read(uint16_t *out) {
   _active = 0;
   for (uint8_t i = 0; i < _n; i++) {
     uint32_t v;
-    if (_type == DIGITAL) v = raw[i] ? 1000 : 0;
+    if (_type == SENSOR_DIGITAL) v = raw[i] ? 1000 : 0;
     else if (!_begun || !_calibrated || _max[i] <= _min[i]) { _err = ERR_NOT_CALIBRATED; v = (uint32_t)raw[i] * 1000UL / (_adcMax ? _adcMax : 1); }
     else {
       uint16_t r = raw[i] < _min[i] ? _min[i] : (raw[i] > _max[i] ? _max[i] : raw[i]);
@@ -209,7 +209,7 @@ void AlashLineSensor::diagnose(Print &out) {
   out.println(T("AlashLineSensor: диагностика", "AlashLineSensor: диагностика", "AlashLineSensor: diagnostics"));
   if (!_begun) { out.println(T("Линейка не запущена: вызовите begin() в setup().", "Линейка іске қосылмаған: setup() ішінде begin() шақырыңыз.", "The bar is not started: call begin() in setup().")); return; }
   out.print(T("Датчиков: ", "Датчиктер: ", "Sensors: ")); out.print((long)_n);
-  out.print(_type == DIGITAL ? T("   цифровые", "   сандық", "   digital") : _type == RC ? F("   RC") : _type == CUSTOM ? T("   своя функция", "   өз функциясы", "   custom reader") : T("   аналоговые", "   аналогтық", "   analog"));
+  out.print(_type == SENSOR_DIGITAL ? T("   цифровые", "   сандық", "   digital") : _type == SENSOR_RC ? F("   RC") : _type == SENSOR_CUSTOM ? T("   своя функция", "   өз функциясы", "   custom reader") : T("   аналоговые", "   аналогтық", "   analog"));
   out.print(T("   максимум АЦП: ", "   АЦП максимумы: ", "   ADC max: ")); out.println((long)_adcMax);
   uint16_t raw[16], norm[16];
   readRaw(raw);
@@ -221,7 +221,7 @@ void AlashLineSensor::diagnose(Print &out) {
   }
   out.print(T("Калибровка: ", "Калибрлеу: ", "Calibration: ")); out.println(_calibrated ? T("есть", "бар", "done") : T("НЕТ", "ЖОҚ", "NOT DONE"));
   uint8_t stuckLow = 0, stuckHigh = 0;
-  for (uint8_t i = 0; i < _n; i++) { if (raw[i] <= 2) stuckLow++; if (_type != DIGITAL && raw[i] + 2 >= _adcMax) stuckHigh++; }
+  for (uint8_t i = 0; i < _n; i++) { if (raw[i] <= 2) stuckLow++; if (_type != SENSOR_DIGITAL && raw[i] + 2 >= _adcMax) stuckHigh++; }
   if (stuckLow == _n) out.println(T("Все датчики показывают 0: нет питания линейки или обрыв сигнальных проводов.", "Барлық датчик 0 көрсетеді: линейкада қуат жоқ немесе сигнал сымдары үзілген.", "All sensors read 0: no power to the bar or the signal wires are broken."));
   if (stuckHigh == _n) out.println(T("Все датчики показывают максимум: на пины приходит питание вместо сигнала или датчики закрыты чёрным.", "Барлық датчик максимум көрсетеді: пиндерге сигнал орнына қуат келеді немесе датчиктер қарамен жабылған.", "All sensors read the maximum: supply arrives instead of the signal or the sensors are covered by black."));
   out.println(T("Подсказки: держите линейку на высоте 3-9 мм от пола (дальше контраст падает). Калибруйте на той поверхности, где будет ехать робот, при том освещении, что будет на соревновании: яркое солнце и лампы с ИК-подсветкой меняют показания. Чёрная изолента даёт лучший контраст, чем маркер. Если робот ловит линию с запозданием, поднимите скорость опроса или уменьшите setSamples().",

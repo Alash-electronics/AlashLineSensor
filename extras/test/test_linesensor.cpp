@@ -11,7 +11,7 @@ static const uint8_t PINS[8] = {20, 21, 22, 23, 24, 25, 26, 27};
 
 // «Поводить над линией и фоном»: линия смещается по всем положениям
 static void sweep(L &s, int steps = 80) { s.calibrateStart(); for (int k = 0; k < steps; k++) { g_floor.lineCenter = -45 + 90.0f * k / (steps - 1); s.calibrateStep(); } }
-static void reset(int n = 5) { g_floor = Floor(); g_floor.n = n; g_emitterPin = -1; g_ms += 100000; }
+static void reset(int n = 5) { g_floor = Floor(); g_floor.n = n; mockReset(); g_ms += 100000; }
 
 int main() {
   // 1) begin и ошибки параметров
@@ -92,11 +92,52 @@ int main() {
     CHECK(abs((int)s.position() - 2500) <= 600);
   }
 
-  // 11) подсветка включается только на время измерения
-  { reset(); L s(PINS, 5); s.begin(); g_emitterPin = 7; g_emitterActiveHigh = true; s.setEmitterPin(7, true); sweep(s, 20);
-    CHECK(!g_floor.emitterOn && g_floor.emitterReads == g_floor.reads);                                    // все чтения шли при включённой подсветке
-    g_floor.emitterReads = g_floor.reads = 0; uint16_t v[16]; s.read(v); CHECK(g_floor.emitterReads == g_floor.reads && g_floor.reads > 0 && !g_floor.emitterOn);
-    reset(); g_emitterPin = 7; g_emitterActiveHigh = false; L t(PINS, 5); t.begin(); t.setEmitterPin(7, false); t.read(v); CHECK(g_floor.emitterReads == g_floor.reads && !g_floor.emitterOn);   // активный LOW
+  // 11) подсветка включается только на время измерения (общая, активный HIGH и активный LOW)
+  { reset(); g_commonEm = 7; g_emActiveHigh = true; L s(PINS, 5); s.begin(); s.setEmitterPin(7, true); sweep(s, 20);
+    CHECK(!emOn(7) && g_floor.emitterReads == g_floor.reads);                                  // все чтения шли при включённой подсветке
+    g_floor.emitterReads = g_floor.reads = 0; uint16_t v[16]; s.read(v); CHECK(g_floor.emitterReads == g_floor.reads && g_floor.reads > 0 && !emOn(7));
+    reset(); g_commonEm = 7; g_emActiveHigh = false; L t(PINS, 5); t.begin(); t.setEmitterPin(7, false); t.read(v); CHECK(g_floor.emitterReads == g_floor.reads && !emOn(7) && g_pinLevel[7] == HIGH);   // активный LOW: выключена уровнем HIGH
+  }
+
+  // 11б) режим вычитания внешнего света: яркий свет занижает показания, ON_AND_OFF возвращает прежние числа
+  { reset(); g_commonEm = 7; L s(PINS, 5); s.begin(); s.setEmitterPin(7, true); sweep(s);
+    g_floor.lineCenter = 0; g_floor.ambient = 60; uint16_t a[16], b[16];
+    s.setReadMode(L::READ_ON); s.readRaw(a);
+    s.setReadMode(L::READ_ON_AND_OFF); s.readRaw(b);
+    CHECK(a[2] == 900 - 60 && abs((int)b[2] - 900) <= 1 && abs((int)b[0] - 80) <= 1);        // с поправкой те же 900 и 80, что и без внешнего света
+    CHECK(g_floor.emitterReads > 0 && !emOn(7));
+    s.setReadMode(L::READ_OFF); s.readRaw(a); CHECK(a[0] == 1023 - 60 && a[2] == 1023 - 60);  // без подсветки видно только внешний свет
+  }
+
+  // 11в) чередование нечётных и чётных подсветок: соседняя подсветка не горит
+  { reset(); g_oddEm = 8; g_evenEm = 9; L s(PINS, 5); s.begin(); s.setEmitterPins(8, 9, true); s.setReadMode(L::READ_ODD_EVEN); sweep(s);
+    CHECK(g_floor.wrongEmitter == 0 && !emOn(8) && !emOn(9));
+    g_floor.lineCenter = 0; uint16_t v[16]; s.read(v); CHECK(v[2] >= 995 && v[1] <= 5 && v[3] <= 5);
+    L t(PINS, 5); t.begin(); t.setReadMode(L::READ_ODD_EVEN); t.readRaw(v);                    // режим без пинов подсветки не падает
+  }
+
+  // 11г) RC-датчики (QTR-RC): время разряда конденсатора, тёмное дольше
+  { reset(); L s(PINS, 5); s.setSensorType(L::SENSOR_RC); s.begin(); CHECK(s.isCalibrated() == false);
+    g_floor.lineCenter = 0; uint16_t raw[16]; s.readRaw(raw);
+    CHECK(raw[2] >= 1900 && raw[2] <= 2100 && raw[0] >= 250 && raw[0] <= 400);                 // над линией около 2000 мкс, над фоном около 300
+    sweep(s); g_floor.lineCenter = 0; uint16_t v[16]; s.read(v); CHECK(v[2] >= 990 && v[0] <= 10 && abs((int)s.position() - 2000) <= 30);
+    g_floor.rcDarkUs = 9000; s.readRaw(raw); CHECK(raw[2] == 2500);                            // дольше таймаута: считается совсем чёрным
+    s.setRcTimeout(1000); CHECK(s.error() == L::ERR_OK); s.setRcTimeout(50); CHECK(s.error() == L::ERR_BAD_VALUE);
+    reset(); g_floor.rcDarkUs = 1800; L w(PINS, 5); w.setSensorType(L::SENSOR_RC); w.setRcTimeout(3000); w.begin(); w.readRaw(raw); CHECK(raw[2] >= 1700 && raw[2] <= 1900);
+    CHECK(w.calMax(0) == 0 && w.calMin(0) == 3000);                                            // максимум шкалы равен таймауту
+  }
+
+  // 11д) своя функция чтения (мультиплексор, АЦП по I2C и т. д.), без пинов
+  { reset(); static int phys[6]; static int calls = 0;
+    struct H { static uint16_t rd(uint8_t i) { calls++; return (uint16_t)phys[i]; } };
+    L s(6); s.setReader(H::rd); s.setAdcMax(4095); CHECK(s.begin() && s.count() == 6);
+    for (int i = 0; i < 6; i++) phys[i] = 3500; phys[3] = 400;
+    s.calibrateStart(); for (int i = 0; i < 6; i++) { s.setCalibration(i, 400, 3500); }
+    for (int i = 0; i < 6; i++) phys[i] = 400; phys[2] = 3500;                               // тёмное даёт большее число
+    uint16_t v[16]; s.read(v); CHECK(v[2] == 1000 && v[0] == 0 && calls >= 6);
+    CHECK(s.position() == 2000);
+    L bad(6); CHECK(!bad.begin() && bad.error() == L::ERR_BAD_COUNT);                         // своя функция не задана
+    L mixed(PINS, 5); mixed.setSensorType(L::SENSOR_CUSTOM); CHECK(mixed.begin());                   // CUSTOM без функции не включается: остаётся аналоговым
   }
 
   // 12) калибровка не удалась (нет контраста) и ручной ввод готовых чисел
